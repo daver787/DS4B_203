@@ -143,16 +143,28 @@ reticulate::conda_list()
 
 # * Step 1. Requires a Session Restart ----
 
-py_discover_config()
+reticulate::py_discover_config()
 
 # * Step 2. Get the Path to your Python Environment ----
+
+library(tidyverse)
+
+env_path <- reticulate::conda_list() %>%
+  filter(name == "my_gluonts_env") %>%
+  pull(python)
 
 
 # * Step 3. Set an R environment variable ----
 
+Sys.setenv(GLUONTS_PYTHON = env_path)
+
+Sys.getenv("GLUONTS_PYTHON")
 
 # Step 4. Load Modeltime - It will override the default using the new python environment
 
+library(modeltime.gluonts)
+
+reticulate::py_discover_config()
 
 # Step 5. Common Gotchas:
 # - If you've already activated an environment or run library(modeltime), you need to restart R
@@ -162,6 +174,7 @@ py_discover_config()
 # 6.0 RE-ACTIVATING THE DEFAULT ENV ----
 # - Requires session restart
 
+reticulate::use_condaenv("r-gluonts", required = TRUE)
+reticulate::py_discover_config()
 
-
-
+library(modeltime.gluonts)
