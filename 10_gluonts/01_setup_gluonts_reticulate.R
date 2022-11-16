@@ -143,7 +143,7 @@ reticulate::conda_list()
 
 # * Step 1. Requires a Session Restart ----
 
-
+py_discover_config()
 
 # * Step 2. Get the Path to your Python Environment ----
 
