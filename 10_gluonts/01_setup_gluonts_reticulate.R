@@ -10,7 +10,7 @@
 # - Install latest Modeltime / Timetk Suite: 
 
 # devtools::install_github("business-science/modeltime")
-#devtools::install_github("business-science/modeltime.gluonts")
+# devtools::install_github("business-science/modeltime.gluonts")
 # devtools::install_github("business-science/modeltime.ensemble")
 # devtools::install_github("business-science/modeltime.resample")
 # devtools::install_github("business-science/timetk")
@@ -21,20 +21,30 @@
 # - Get the default 'r-gluonts' conda environment set up
 
 # * Step 1: Load the Library ----
-
+library(modeltime.gluonts)
 
 # * Step 2: Install the Python Environment ----
+
+install_gluonts(fresh_install = TRUE, include_pytorch = TRUE)
 
 
 # * Step 3: Restart R Session ----
 
+reticulate::py_discover_config()
 
+is_gluonts_activated()
+
+get_python_env()
 
 # * Troubleshooting ----
 
 # 1. No conda?
 
+reticulate::conda_version()
 
+
+#reticulate::install_miniconda()
+#reticulate::conda_install()
 
 # 2. Windows - Need Visual Studio C++ for Python
 "https://github.com/business-science/modeltime.gluonts/issues/4"
@@ -47,33 +57,87 @@
 
 # Test a GluonTS DeepAR Model
 
+library(modeltime.gluonts)
+library(tidyverse)
+library(tidymodels)
+library(timetk)
 
 # Data
 
+df<- tibble(
+  grp  = "A",
+  date = tk_make_timeseries("2011","2015", by ="month"),
+  y    = 1:60
+)
 
+splits <- df %>%
+  time_series_split(assess = 12, cumulative = TRUE)
+
+
+model_fit_deepar <- deep_ar(
+  id                = "grp",
+  freq              = "M",
+  prediction_length = 12,
+  lookback_length   = 36
+) %>%
+  set_engine("gluonts_deepar") %>%
+  fit(y ~ ., data =training(splits))
+
+modeltime_table(
+  model_fit_deepar
+) %>%
+  modeltime_calibrate(testing(splits)) %>%
+  modeltime_forecast(
+    new_data    = testing(splits),
+    actual_data = df
+  ) %>%
+  plot_modeltime_forecast()
 
 # 3.0 RETICULATE NAVIGATION ----
-
-
+library(reticulate)
 
 # * Which Environments are Available? ----
 
+conda_list()
 
+virtualenv_list()
 
 # * Which Environment am I Using? ----
 
-
+py_discover_config()
 
 # * What's in My Environment? ----
 
+reticulate::py_list_packages(envname = "r-gluonts")
 
+conda_path <- conda_binary()
+
+system2(conda_path, args ="list -n r-gluonts")
 
 # 4.0 SETTING UP A CUSTOM PYTHON ENVIRONMENT ----
 
 # Py Install
 
+reticulate::py_install(
+  packages       = c(
+    "mxnet==1.6",
+    "gluonts==0.6.3",
+    "numpy==1.16.6",
+    "pandas==1.0.5",
+    "scikit-learn==0.23.2",
+    "matplotlib==3.3.2",
+    "seaborn==0.11.0",
+    "pathlib==1.0.1"
+    ),
+  envname        = "my_gluonts_env",
+  method         = "conda",
+  python_version = "3.6",
+  pip            = TRUE
+)
+
 # Find the Environment Python
 
+reticulate::conda_list()
 
 # 5.0 ACTIVATING A CUSTOM PYTHON ENV ----
 
