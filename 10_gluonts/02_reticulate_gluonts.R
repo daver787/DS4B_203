@@ -142,19 +142,49 @@ Trainer         <- gluonts$mx$trainer$Trainer
 # * Model Specification 
 
 
+DeepAR_spec_1 <- DeepAREstimator(
+  freq              = "W",
+  prediction_length = 12,
+  trainer           = Trainer(
+    epochs = 5
+    )
+)
+
+DeepAR_spec_1
+
 # * Fitting the GluonTS Model
 
+DeepAR_fit_1 <- DeepAR_spec_1$train(training_data = data_prepared_list_dataset)
+
+DeepAR_fit_1  %>% class()
 
 
 # 7.0 PREDICTION ----
 
 # * Prediction Object ----
+prediction <- DeepAR_fit_1$predict(dataset = data_prepared_list_dataset)
 
+prediction %>% class()
 
+first_prediction <- reticulate::iter_next(prediction)
+
+first_prediction %>% class()
 
 # * Probabilistic Forecasting  -----
 
+first_prediction$mean %>% class()
 
+first_prediction$mean %>% py_to_r() %>% as.numeric()
+
+first_prediction$mean_ts %>% class()
+
+first_prediction$median
+
+first_prediction$quantile(0.5)
+
+first_prediction$quantile(0.75)
+
+first_prediction$quantile(0.25)
 
 # 8.0 MATPLOTLIB PROBABILISTIC VISUALIZATION ----
 
