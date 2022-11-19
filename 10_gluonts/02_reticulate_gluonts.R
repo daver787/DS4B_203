@@ -188,28 +188,112 @@ first_prediction$quantile(0.25)
 
 # 8.0 MATPLOTLIB PROBABILISTIC VISUALIZATION ----
 
+matplotlib <- import("matplotlib", convert = FALSE)
 
+plt <- matplotlib$pyplot
+
+plt$style$available %>% py_to_r()
+
+plt$style$use(style = "seaborn-dark-palette")
+
+to_pandas(data_prepared_list_dataset$list_data[0])$plot()
+
+first_prediction$plot(
+  prediction_intervals = c(50, 90),
+  color                = "blue"
+)
+
+plt$show()
+
+plt$close()
 
 # 9.0 GGPLOT & PLOTLY PROBABILISTIC FORECAST VISUALIZATION ----
 
 
+future_predictions_deep_ar_1_tbl <- future_tbl %>%
+  mutate(
+    revenue = first_prediction$mean %>% py_to_r() %>% as.numeric(),
+    type    = "prediction",
+    ci_lo   = first_prediction$quantile(0.025) %>% py_to_r() %>% as.numeric(),
+    ci_hi   = first_prediction$quantile(0.975) %>% py_to_r() %>% as.numeric(),
+    ci_lo2  = first_prediction$quantile(0.05) %>% py_to_r() %>% as.numeric(),
+    ci_hi2  = first_prediction$quantile(0.95) %>% py_to_r() %>% as.numeric()
+  )
+
+g <- data_prepared_tbl %>%
+  mutate(type = "actual") %>%
+  bind_rows(future_predictions_deep_ar_1_tbl) %>%
+  plot_time_series(
+    .date_var    = purchased_at,
+    .value       = revenue,
+    .color_var   = type,
+    .smooth      = FALSE,
+    .interactive = FALSE
+  ) +
+  geom_ribbon(aes(ymin = ci_lo, ymax = ci_hi), alpha = 0.2, fill = "gray50") +
+  geom_ribbon(aes(ymin = ci_lo2, ymax = ci_hi2), alpha = 0.2, fill = "gray50")
+
+
+ggplotly(g)
 
 # 10.0 MODELTIME ----
 
+
+?deep_ar
+
+
+model_fit_deepar_1 <- deep_ar(
+  id                = "id",
+  freq              = "W",
+  prediction_length = 12,
+  epochs            = 15
+) %>%
+  set_engine("gluonts_deepar") %>%
+  fit(revenue ~ ., data = data_prepared_tbl)
+
+
+model_fit_arima_1 <- arima_reg(seasonal_period = 4) %>%
+  set_engine("auto_arima") %>%
+  fit(revenue ~ purchased_at, data = data_prepared_tbl)
+
+modeltime_table(
+  model_fit_deepar_1,
+  model_fit_arima_1
+) %>%
+  modeltime_forecast(
+    new_data    = future_tbl,
+    actual_data = data_prepared_tbl
+  ) %>%
+  plot_modeltime_forecast()
 
 
 # 11.0 SAVING / LOADING MODELS ----
 
 # * GluonTS ----
 
+fs::dir_create("00_models/deep_ar_1_revenue_weekly")
 
+pathlib <- import("pathlib", convert = FALSE)
+
+
+model_path <- pathlib$Path("00_models/deep_ar_1_revenue_weekly/")
+
+DeepAR_fit_1$serialize(model_path)
+
+model_reloaded <- gluonts$model$predictor$Predictor$deserialize(path = model_path)
+
+model_reloaded$predict(dataset = data_prepared_list_dataset)
 
 
 # * Modeltime ----
 
+model_fit_deepar_1 %>%
+  save_gluonts_model("00_models/deep_ar_1_revenue_weekly_mdl")
 
+model_reloaded_2 <- load_gluonts_model("00_models/deep_ar_1_revenue_weekly_mdl/")
 
-
+model_reloaded_2 %>%
+  predict(new_data = future_tbl)
 
 # 12.0 BONUS - Deep Factor Estimator ----
 
