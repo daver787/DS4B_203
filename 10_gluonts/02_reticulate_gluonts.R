@@ -299,14 +299,44 @@ model_reloaded_2 %>%
 
 # * Model Specification 
 
+DeepFactorEstimator <- gluonts$model$deep_factor$DeepFactorEstimator
+
+Trainer <- gluonts$mx$trainer$Trainer
+
+DeepFactor_spec_1 <- DeepFactorEstimator(
+  freq              = "W",
+  prediction_length = 12,
+  trainer           = Trainer(epochs = 10)
+)
+
+DeepFactor_spec_1
 
 # * Fitting the GluonTS DeepFactor Model ----
+
+DeepFactor_fit_1 <- DeepFactor_spec_1$train(data_prepared_list_dataset)
+
+DeepFactor_fit_1
+
+predictor <- DeepFactor_fit_1$predict(dataset = data_prepared_list_dataset)
+
+predictions <- iter_next(predictor)
 
 
 # * Visualize  ----
 
+matplotlib <- import("matplotlib", convert = FALSE)
 
+plt <- matplotlib$pyplot
 
+plt$style$use("fivethirtyeight")
+
+to_pandas(data_prepared_list_dataset$list_data[0])$plot()
+
+predictions$plot(prediction_intervals = c(50, 90))
+
+plt$show()
+
+plt$close()
 
 # CONCLUSIONS ----
 
