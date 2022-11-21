@@ -134,12 +134,40 @@ training(splits) %>%
 # 3.0 GLUONTS MODELS ----
 
 # * GLUON Recipe Specification ----
+recipe_spec_gluon <- recipe(
+  pageViews ~ pagePath + date + rowid,
+  data = training(splits)) %>%
+  update_role(rowid, new_role = "indicator")
 
+recipe_spec_gluon %>% prep() %>% juice()
+
+recipe_spec_gluon %>% prep() %>% summary()
 
 
 # * DeepAR Estimator ----
 
 # Model 1: Default GluonTS
+
+?deep_ar
+
+model_spec_1 <- deep_ar(
+  
+  # Required params
+  id                = "pagePath",
+  freq              = "D",
+  prediction_length = FORECAST_HORIZON,
+  
+  # Trainer(Common Models)
+  epochs            = 5
+  
+) %>%
+  set_engine("gluonts_deepar")
+
+
+wflw_fit_deepar_1 <- workflow() %>%
+  add_model(model_spec_1) %>%
+  add_recipe(recipe_spec_gluon) %>%
+  fit(training(splits))
 
 
 
@@ -155,11 +183,27 @@ training(splits) %>%
 
 # ** Modeltime Comparison ----
 
+model_tbl_submodels <- modeltime_table(
+  wflw_fit_deepar_1
+) 
+
 # Forecast Accuracy
 
-
+model_tbl_submodels %>%
+  modeltime_accuracy(testing(splits))
 
 # Forecast Visualization
+
+model_tbl_submodels %>%
+  modeltime_forecast(
+    new_data    = testing(splits),
+    actual_data = data_prepared_tbl,
+    keep_data   = TRUE
+  ) %>%
+  group_by(pagePath) %>%
+  plot_modeltime_forecast(
+    .facet_ncol = 4
+  )
 
 
 # Investigate Model Failures
