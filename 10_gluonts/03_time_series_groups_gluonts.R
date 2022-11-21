@@ -150,7 +150,7 @@ recipe_spec_gluon %>% prep() %>% summary()
 
 ?deep_ar
 
-model_spec_1 <- deep_ar(
+model_spec_deepar_1 <- deep_ar(
   
   # Required params
   id                = "pagePath",
@@ -158,24 +158,55 @@ model_spec_1 <- deep_ar(
   prediction_length = FORECAST_HORIZON,
   
   # Trainer(Common Models)
-  epochs            = 5
+  epochs            = 5,
+  
+  # DeepAR specific
+  cell_type         = "lstm"
   
 ) %>%
   set_engine("gluonts_deepar")
 
 
 wflw_fit_deepar_1 <- workflow() %>%
-  add_model(model_spec_1) %>%
+  add_model(model_spec_deepar_1) %>%
   add_recipe(recipe_spec_gluon) %>%
   fit(training(splits))
 
 
-
 # Model 2: Increase Epochs, Adjust Num Batches per Epoch
 
+model_spec_deepar_2 <- deep_ar(
+  id                    = "pagePath",
+  freq                  = "D",
+  prediction_length     = FORECAST_HORIZON,
+  
+  epochs                = 10,
+  num_batches_per_epoch = 35,
+) %>%
+  set_engine("gluonts_deepar")
+
+wflw_fit_deepar_2 <- workflow() %>%
+  add_model(model_spec_deepar_2) %>%
+  add_recipe(recipe_spec_gluon) %>%
+  fit(training(splits))
 
 
 # Model 3: Increase Epochs, Adjust Num Batches Per Epoch, & Add Scaling 
+
+model_spec_deepar_3 <- deep_ar(
+  id                    = "pagePath",
+  freq                  = "D",
+  prediction_length     = FORECAST_HORIZON,
+  epochs                = 10,
+  num_batches_per_epoch = 35,
+  scale                 = TRUE
+) %>%
+  set_engine("gluonts_deepar")
+
+wflw_fit_deepar_3 <- workflow() %>%
+  add_model(model_spec_deepar_3) %>%
+  add_recipe(recipe_spec_gluon) %>%
+  fit(training(splits))
 
 
 # * N-BEATS Estimator ----
@@ -184,7 +215,9 @@ wflw_fit_deepar_1 <- workflow() %>%
 # ** Modeltime Comparison ----
 
 model_tbl_submodels <- modeltime_table(
-  wflw_fit_deepar_1
+  wflw_fit_deepar_1,
+  wflw_fit_deepar_2,
+  wflw_fit_deepar_3
 ) 
 
 # Forecast Accuracy
@@ -194,12 +227,15 @@ model_tbl_submodels %>%
 
 # Forecast Visualization
 
-model_tbl_submodels %>%
+forecast_submodels_test_tbl <- model_tbl_submodels %>%
   modeltime_forecast(
     new_data    = testing(splits),
     actual_data = data_prepared_tbl,
     keep_data   = TRUE
-  ) %>%
+  ) 
+
+
+forecast_submodels_test_tbl %>%
   group_by(pagePath) %>%
   plot_modeltime_forecast(
     .facet_ncol = 4
@@ -208,6 +244,16 @@ model_tbl_submodels %>%
 
 # Investigate Model Failures
 
+forecast_submodels_test_tbl %>% skimr::skim()
+
+forecast_submodels_test_tbl %>%
+  filter(is.na(.value)) %>%
+  select(.model_id, .model_desc, .index, pagePath, .value)
+
+
+training(splits) %>% distinct(pagePath)
+
+testing(splits) %>% distinct(pagePath)
 
 # Forecast Future
 
