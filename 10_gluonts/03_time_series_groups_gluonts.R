@@ -209,7 +209,62 @@ wflw_fit_deepar_3 <- workflow() %>%
   fit(training(splits))
 
 
-# * N-BEATS Estimator ----
+# * N-BEATS Estimator ---- 
+
+#Default model
+
+# Model 4
+model_spec_nbeats_4 <- nbeats(
+  id                = "pagePath",
+  freq              = "D",
+  prediction_length = FORECAST_HORIZON,
+  lookback_length   = 2 * FORECAST_HORIZON
+) %>%
+  set_engine("gluonts_nbeats")
+
+wflw_fit_nbeats_4 <- workflow() %>%
+  add_model(model_spec_nbeats_4) %>%
+  add_recipe(recipe_spec_gluon) %>%
+  fit(training(splits))
+
+
+# Model 5, Loss Function MASE, Reduce Epochs to 4
+
+model_spec_nbeats_5 <- nbeats(
+  id                = "pagePath",
+  freq              = "D",
+  prediction_length = FORECAST_HORIZON,
+  lookback_length   = 2 * FORECAST_HORIZON,
+  epochs            = 20,
+  loss_function     = "MASE"
+) %>%
+  set_engine("gluonts_nbeats")
+
+
+wflw_fit_nbeats_5 <- workflow() %>%
+  add_model(model_spec_nbeats_5) %>%
+  add_recipe(recipe_spec_gluon) %>%
+  fit(training(splits))
+
+#Model 6 Ensemble
+
+model_spec_nbeats_6 <- nbeats(
+  id                    = "pagePath",
+  freq                  = "D",
+  prediction_length     = FORECAST_HORIZON,
+  lookback_length       = c(FORECAST_HORIZON,2 * FORECAST_HORIZON),
+  epochs                = 2,
+  num_batches_per_epoch = 35,
+  loss_function         = "MASE",
+  bagging_size          = 3
+  
+) %>%
+  set_engine("gluonts_nbeats_ensemble")
+
+wflw_fit_nbeats_6 <- workflow() %>%
+  add_model(model_spec_nbeats_6) %>%
+  add_recipe(recipe_spec_gluon) %>%
+  fit(training(splits))
 
 
 # ** Modeltime Comparison ----
@@ -217,7 +272,10 @@ wflw_fit_deepar_3 <- workflow() %>%
 model_tbl_submodels <- modeltime_table(
   wflw_fit_deepar_1,
   wflw_fit_deepar_2,
-  wflw_fit_deepar_3
+  wflw_fit_deepar_3,
+  wflw_fit_nbeats_4,
+  wflw_fit_nbeats_5,
+  wflw_fit_nbeats_6
 ) 
 
 # Forecast Accuracy
@@ -258,11 +316,24 @@ testing(splits) %>% distinct(pagePath)
 # Forecast Future
 
 
+submodel_inspection_tbl <- modeltime_table(
+  wflw_fit_deepar_2,
+  wflw_fit_deepar_3
+)
 
 
+deepar_submodel_refitted_tbl <- submodel_inspection_tbl %>%
+  modeltime_refit(data_prepared_tbl)
 
 
-
+deepar_submodel_refitted_tbl %>%
+  modeltime_forecast(
+    new_data    = future_tbl,
+    actual_data = data_prepared_tbl,
+    keep_data   = TRUE
+  ) %>%
+  group_by(pagePath)%>%
+  plot_modeltime_forecast(.facet_ncol = 4)
 
 # 4.0 MACHINE LEARNING ----
 
