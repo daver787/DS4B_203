@@ -416,6 +416,21 @@ plan(sequential)
 
 # * Test Evaluations ----
 
+testing(splits) %>% distinct(pagePath)
+training(splits) %>% distinct(pagePath)
+
+page_paths_train <- training(splits) %>% distinct(pagePath) %>% pull(pagePath)
+
+submodels_tbl <- submodel_inspection_tbl %>%
+  update_model_description(1, "DEEPAR - Unscaled") %>%
+  update_model_description(1, "DEEPAR - Scaled") %>%
+  add_modeltime_model(wflw_fit_xgboost)
+
+submodels_tbl %>%
+  modeltime_accuracy(testing(splits)
+                     #%>% filter(pagePath %in% page_paths_train)
+                     )
+
 
 # * Future Evaluations ----
 
