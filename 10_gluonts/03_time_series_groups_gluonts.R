@@ -339,17 +339,77 @@ deepar_submodel_refitted_tbl %>%
 
 # * Parallel Processing ----
 
+registerDoFuture()
+
+n_cores <- parallel::detectCores()
+
+plan(
+  strategy = cluster,
+  workers  = parallel::makeCluster(n_cores)
+)
+
 
 # * ML Recipe Specification ----
+
+training(splits)
+
+recipe_spec_ml <- recipe(pageViews ~ ., data = training(splits)) %>%
+  update_role(rowid, new_role = "indicator") %>%
+  step_timeseries_signature(date) %>%
+  step_rm(matches("(.xts$)|(.iso$)|(hour)|(minute)|(second)|(am.pm)")) %>%
+  step_normalize(contains("index.num"), ends_with("_year")) %>%
+  step_other(pagePath) %>%
+  step_dummy(all_nominal(), one_hot = TRUE) %>%
+  step_rm(date)
+
+recipe_spec_ml %>% prep() %>% juice() %>% glimpse()
+
+recipe_spec_ml %>% prep() %>% summary()
 
 
 # * XGBoost ----
 
 
+model_spec_xgboost_tune <- boost_tree(
+  mode           = "regression",
+  mtry           = tune(),
+  trees          = 300,
+  min_n          = tune(),
+  tree_depth     = tune(),
+  learn_rate     = tune(),
+  loss_reduction = tune()
+) %>%
+  set_engine("xgboost")
+
+
+wflw_spec_tune_xgboost <- workflow() %>%
+  add_model(model_spec_xgboost_tune) %>%
+  add_recipe(recipe_spec_ml)
+
+
+set.seed(123)
+resamples_kfold <- training(splits) %>% vfold_cv(v = 5)
+
+tune_results_xgboost <- tune_grid(
+  object     = wflw_spec_tune_xgboost,
+  resamples  = resamples_kfold,
+  param_info = parameters(wflw_spec_tune_xgboost) %>%
+    update(learn_rate = learn_rate(range= c(0.15, 0.5), trans = NULL)) %>%
+    update(mtry       = mtry(range =c(1L, 60L), trans = NULL)),
+  grid       = 10,
+  control    = control_grid(verbose = TRUE, allow_par = TRUE)
+)
+
+best_results <- tune_results_xgboost %>%
+  show_best(metric = "rmse", n = 10)
+
+wflw_fit_xgboost <- wflw_spec_tune_xgboost %>%
+  finalize_workflow(best_results %>% slice(1)) %>%
+  fit(training(splits))
 
 # * End Parallel Processing ----
 
-
+plan(sequential)
 
 
 # 5.0 EVALUATION ----
